@@ -42,7 +42,10 @@ class FakeReceiver:
         self.cache = {}
         self.state = {'protocol_version': 1, 'server_id': 'test-boot', 'last_sequence': None,
                       'updated_stamp': time.time(), 'task_id': None, 'phase': 'IDLE',
-                      'last_command': None}
+                      'last_command': None, 'execution_updated_stamp': time.time(),
+                      'startup_checked': True, 'runtime_phase': 'IDLE', 'cancellation_pending': False,
+                      'datum': 'WGS84', 'physical_reference': 'base_link_horizontal'}
+        self.worker_stalled = False
         self.publisher = rospy.Publisher(namespace + '/state', String, queue_size=1, latch=True)
         self.subscriber = rospy.Subscriber(namespace + '/command', Command, self.command, queue_size=10)
         self.timer = rospy.Timer(rospy.Duration(.02), self.tick)
@@ -51,6 +54,8 @@ class FakeReceiver:
         with self.lock:
             if self.emit:
                 self.state['updated_stamp'] = rospy.Time.now().to_sec() + self.offset
+                if not self.worker_stalled:
+                    self.state['execution_updated_stamp'] = rospy.Time.now().to_sec()
                 payload = self.invalid if self.invalid is not None else json.dumps(self.state)
                 self.publisher.publish(String(data=payload))
 
@@ -322,6 +327,72 @@ class ClientRosTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertLess(time.monotonic() - started, 4.)
         self.assertIn('timed out', result.stderr)
+
+    def test_stale_worker_blocks_routes_but_allows_stop_commands(self):
+        self.client.set_task(point(1., 2.))
+        with self.server.lock:
+            self.server.worker_stalled = True
+            self.server.state['execution_updated_stamp'] = rospy.Time.now().to_sec() - 10.
+        until(lambda: not self.client.health()['execution_healthy'])
+        for operation, kwargs in [('SET_TASK', {'final_goal': point(3., 4.)}),
+                                  ('REPLACE_VIA_POINTS', {'via_points': []}), ('RESUME', {})]:
+            with self.assertRaises(ClientError) as caught:
+                self.client.command(operation, **kwargs)
+            self.assertFalse(caught.exception.published)
+        self.client.pause()
+        self.client.cancel()
+        self.assertEqual([msg.operation for msg in self.server.commands], ['SET_TASK', 'PAUSE', 'CANCEL'])
+
+    def test_startup_and_cancel_barrier_block_new_routes(self):
+        for key, value in [('startup_checked', False), ('cancellation_pending', True)]:
+            with self.server.lock:
+                self.server.state.update(startup_checked=True, cancellation_pending=False)
+                self.server.state[key] = value
+            until(lambda: self.client.status().get(key) == value)
+            with self.assertRaises(ClientError):
+                self.client.set_task(point(1., 2.))
+        self.assertEqual(self.server.commands, [])
+
+    def test_replay_ignores_unchanged_old_transport_error(self):
+        request = build_request(self.client.status(), 'SET_TASK', point(1., 2.))
+        self.server.mode = 'drop'
+        with self.server.lock:
+            self.server.state['transport_error'] = dict(request_id=request['request_id'],
+                                                       reason='old queue full', stamp=time.time()-10.)
+        until(lambda: self.client.status().get('transport_error') is not None)
+        started = time.monotonic()
+        with self.assertRaises(OutcomeUnknown) as caught:
+            self.client.replay(request)
+        self.assertIn('Receipt timeout', str(caught.exception))
+        self.assertGreaterEqual(time.monotonic()-started, .45)
+        self.assertEqual(len(self.server.commands), 1)
+
+    def test_new_transport_error_is_reported_after_publish(self):
+        self.server.mode = 'drop'
+
+        def error_after_command():
+            until(lambda: bool(self.server.commands))
+            with self.server.lock:
+                self.server.state['transport_error'] = dict(request_id=self.server.commands[0].request_id,
+                                                           reason='new queue full', stamp=time.time())
+
+        worker = threading.Thread(target=error_after_command)
+        worker.start()
+        try:
+            with self.assertRaises(OutcomeUnknown) as caught:
+                self.client.set_task(point(1., 2.))
+            self.assertIn('new queue full', str(caught.exception))
+        finally:
+            worker.join(3.)
+
+    def test_cli_health_and_task_status_are_readonly(self):
+        health = self.run_cli('health')
+        self.assertEqual(health.returncode, 0, health.stderr)
+        self.assertTrue(json.loads(health.stdout)['execution_healthy'])
+        report = self.run_cli('task-status', 'missing-task')
+        self.assertEqual(report.returncode, 0, report.stderr)
+        self.assertEqual(json.loads(report.stdout)['status'], 'UNKNOWN')
+        self.assertEqual(self.server.commands, [])
 
 
 if __name__ == '__main__':

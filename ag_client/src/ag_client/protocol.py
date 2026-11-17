@@ -13,7 +13,7 @@ import uuid
 
 UINT64_MAX = (1 << 64) - 1
 OPERATIONS = frozenset(("SET_TASK", "REPLACE_VIA_POINTS", "PAUSE", "RESUME", "CANCEL"))
-UNFINISHED_PHASES = frozenset(("READY", "EXECUTING", "PAUSING", "PAUSED", "BLOCKED", "CANCELING"))
+UNFINISHED_PHASES = frozenset(("READY", "EXECUTING", "PAUSING", "PAUSED", "BLOCKED"))
 REQUEST_FIELDS = frozenset(("protocol_version", "server_id", "sequence", "request_id",
                             "task_id", "operation", "final_goal", "via_points"))
 POINT_FIELDS = frozenset(("latitude", "longitude", "altitude_ellipsoid_m", "yaw"))

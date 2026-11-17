@@ -33,14 +33,14 @@ def _init_ros(rospy, timeout):
 def parser():
     root = argparse.ArgumentParser(description='Air-ground V1 client; accepted is not task completion')
     subs = root.add_subparsers(dest='command', required=True)
-    for name in ('status', 'set', 'replace-via', 'pause', 'resume', 'cancel', 'replay'):
+    for name in ('status', 'health', 'task-status', 'set', 'replace-via', 'pause', 'resume', 'cancel', 'replay'):
         sub = subs.add_parser(name)
         for option, default in [('state-timeout', 5.), ('state-max-age', 2.),
-                                ('connect-timeout', 3.), ('receipt-timeout', 3.)]:
+                                ('connect-timeout', 3.), ('receipt-timeout', 3.), ('execution-max-age', 2.)]:
             sub.add_argument('--' + option, type=float, default=default)
         sub.add_argument('--command-topic', default='/air_ground/command')
         sub.add_argument('--state-topic', default='/air_ground/state')
-        if name not in ('status', 'replay'):
+        if name not in ('status', 'health', 'task-status', 'replay'):
             sub.add_argument('--save-request')
         if name in ('set', 'replace-via'):
             sub.add_argument('--via-file', action='append', default=[])
@@ -52,13 +52,15 @@ def parser():
             sub.add_argument('--yaw', type=float)
         if name == 'replay':
             sub.add_argument('request_file')
+        if name == 'task-status':
+            sub.add_argument('task_id')
     return root
 
 
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
-        for name in ('state_timeout', 'state_max_age', 'connect_timeout', 'receipt_timeout'):
+        for name in ('state_timeout', 'state_max_age', 'connect_timeout', 'receipt_timeout', 'execution_max_age'):
             value = getattr(args, name)
             if not math.isfinite(value) or value <= 0:
                 raise ProtocolError(name + ' must be finite and positive')
@@ -81,11 +83,15 @@ def main(argv=None):
         from .client import AirGroundClient, CommandRejected, OutcomeUnknown
         _init_ros(rospy, args.state_timeout)
         options = {key: getattr(args, key) for key in
-                   ('command_topic', 'state_topic', 'state_timeout', 'state_max_age', 'connect_timeout', 'receipt_timeout')}
+                   ('command_topic', 'state_topic', 'state_timeout', 'state_max_age', 'connect_timeout', 'receipt_timeout', 'execution_max_age')}
         with AirGroundClient(**options) as client:
             try:
                 if args.command == 'status':
                     output = client.status()
+                elif args.command == 'health':
+                    output = client.health()
+                elif args.command == 'task-status':
+                    output = client.task_status(args.task_id)
                 elif args.command == 'replay':
                     output = client.replay(request)
                 else:

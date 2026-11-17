@@ -15,6 +15,7 @@ from slicer_air_ground_msgs.msg import Command, GeoPoint
 
 from .protocol import (ProtocolError, loads_json, validate_state, validate_request,
                        build_request, save_request)
+from .observation import execution_problem, task_report
 
 
 class ClientError(RuntimeError):
@@ -69,13 +70,15 @@ class AirGroundClient:
     """
 
     def __init__(self, command_topic='/air_ground/command', state_topic='/air_ground/state',
-                 state_timeout=5., state_max_age=2., connect_timeout=3., receipt_timeout=3.):
+                 state_timeout=5., state_max_age=2., connect_timeout=3., receipt_timeout=3.,
+                 execution_max_age=2.):
         for name, value in locals().copy().items():
-            if name.endswith('timeout') or name == 'state_max_age':
+            if name.endswith('timeout') or name in ('state_max_age', 'execution_max_age'):
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                     raise ValueError(name + ' must be finite and positive')
         self.state_timeout, self.state_max_age = state_timeout, state_max_age
         self.connect_timeout, self.receipt_timeout = connect_timeout, receipt_timeout
+        self.execution_max_age = execution_max_age
         self._condition = threading.Condition()
         self._sending = threading.Lock()
         self._state = None
@@ -122,6 +125,22 @@ class AirGroundClient:
                 if left <= 0:
                     raise ClientError('No fresh state: ' + (self._error or 'stale/future ROS timestamp; check clocks'))
                 self._condition.wait(min(left, .05))
+
+    def task_status(self, task_id):
+        """Interpret same-task evidence from a fresh state; sends no commands."""
+        return task_report(self.status(), task_id)
+
+    def health(self):
+        """Worker-level readiness only; vehicle owns localization/Mux checks."""
+        state = self.status()
+        problem = execution_problem(state, rospy.Time.now().to_sec(), self.execution_max_age)
+        return dict(execution_healthy=problem is None, reason=problem or '',
+                    server_id=state['server_id'], task_id=state['task_id'], phase=state['phase'],
+                    task_reason=state.get('reason', ''), last_error=state.get('last_error', ''),
+                    updated_stamp=state['updated_stamp'],
+                    execution_updated_stamp=state.get('execution_updated_stamp'),
+                    runtime_phase=state.get('runtime_phase'), startup_checked=state.get('startup_checked'),
+                    cancellation_pending=state.get('cancellation_pending'))
 
     @contextmanager
     def _serial(self):
@@ -170,12 +189,17 @@ class AirGroundClient:
             raise ClientError('Receiver restarted; saved request belongs to another boot')
         if not replay and (state['last_sequence'] or 0) >= request['sequence']:
             raise ClientError('Sequence changed while connecting; check other command senders')
+        if not replay and request['operation'] in ('SET_TASK', 'REPLACE_VIA_POINTS', 'RESUME'):
+            problem = execution_problem(state, rospy.Time.now().to_sec(), self.execution_max_age)
+            if problem:
+                raise ClientError(problem)
         # Replays may legitimately have old sequence values; receiver owns deduplication.
         if save_path is not None:
             save_request(request, save_path)
         with self._condition:
             self._check_open()
             baseline = self._received
+            previous_error = copy.deepcopy((self._state or {}).get('transport_error'))
             try:
                 self._publisher.publish(message)
             except Exception as exc:
@@ -196,7 +220,8 @@ class AirGroundClient:
                                 raise CommandRejected(receipt, request)
                             return copy.deepcopy(receipt)
                     error = state.get('transport_error')
-                    if isinstance(error, dict) and error.get('request_id') == request['request_id']:
+                    if (isinstance(error, dict) and error != previous_error
+                            and error.get('request_id') == request['request_id']):
                         raise OutcomeUnknown('Receiver transport error: ' + str(error.get('reason')), request)
                 left = deadline - time.monotonic()
                 if left <= 0:

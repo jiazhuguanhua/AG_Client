@@ -4,6 +4,8 @@ ROS1 Noetic 空地任务 V1 客户端，按 `air_ground_interface_v1(1).md`（20
 
 ## 构建
 
+已对照用户提供的车端 ZIP 源码完成适配；[小车架构、适配结论与车端建议](docs/vehicle_architecture.md)。
+
 ```bash
 cd ~/catkin_ws
 source /opt/ros/noetic/setup.bash
@@ -20,6 +22,10 @@ MD5 必须为 `b574bb9bb1240c0d2ae262d6c3feb2bf`。同一工作区不得重复�
 
 ```bash
 rosrun ag_client ag_client_cli.py status
+rosrun ag_client ag_client_cli.py health
+rosrun ag_client ag_client_cli.py task-status "$TASK_ID"  # 只读检查指定任务的完成证据
+rosrun ag_client ag_client_cli.py health   # 只读：执行线程/启动检查/取消屏障
+rosrun ag_client ag_client_cli.py task-status TASK_ID  # 只读：该任务的完成证据
 
 # TARGET_FILE 为真实 geographic.py capture 文件的本机路径
 rosrun ag_client ag_client_cli.py set --target-file "$TARGET_FILE" \
@@ -36,7 +42,9 @@ rosrun ag_client ag_client_cli.py replay /tmp/mission.request.json
 
 所有等待选项放在子命令后：`--state-timeout 5 --state-max-age 2 --connect-timeout 3 --receipt-timeout 3`，单位秒，必须为有限正数。`--command-topic`、`--state-topic` 支持隔离测试的重命名，实际使用保持默认正式 topic。
 
-退出码：`0` 收到明确受理（status 为获取新鲜状态）；`1` 车端明确拒绝；`2` 本地输入/传输/回执异常。**回执超时可能已执行**，会打印原请求；先读状态，再按需 replay 保存文件。保存必须使用新路径，拒绝覆盖；不要编辑已保存请求后重放。
+新 SET/REPLACE/RESUME 发布前还检查执行快照、启动状态及取消屏障，`--execution-max-age` 默认2秒；不会将 worker 卡住时持续发布的新鲜反馈当作可执行。PAUSE/CANCEL 不增加这些门禁；replay 保持准确旧请求语义。
+
+退出码：任务命令 `0` 收到明确受理，`1` 车端明确拒绝，`2` 本地输入/传输/回执异常；只读 status/health/task-status 的 `0` 表示获取结果，是否健康/完成须看输出字段。**回执超时可能已执行**，会打印原请求；先读状态，再按需 replay 保存文件。保存必须使用新路径，拒绝覆盖；不要编辑已保存请求后重放。
 
 ## Python 接入
 
@@ -62,6 +70,8 @@ with AirGroundClient() as client:
 命令非锁存、队列 1、每次调用只发布一次。新命令读取新鲜状态分配全局序号；相同主机、用户、master/topic 的发送操作互斥。跨主机无法由本地锁仲裁，飞机端仍必须保留唯一串行出口，人工命令也通过该出口协调。断网不自动取消，车端可继续最后任务。
 
 `accepted=true` 表示受理。最终完成看同任务 `phase=COMPLETED`、`last_task_result`，以及 Action 成功、停车窗口和地理复核全部通过；客户端不把受理当作到达。
+
+Python 可调用 `client.health()` 和 `client.task_status(task_id)`，后者仅对匹配任务且三项证据与静止窗口均有效时返回 `verified_complete=true`；它是对车端软件证据的检查，不是独立物理测量。
 
 ## 验证
 

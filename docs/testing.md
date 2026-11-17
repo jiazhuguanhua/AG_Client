@@ -6,7 +6,9 @@
 | --- | --- |
 | 两包 Catkin 定向构建及 install | 通过 |
 | 协议单元测试 | 18 项通过 |
-| 独立 master、`/test_ag/*` 假车端集成测试 | 17 项通过，0 errors / 0 failures |
+| 执行健康/任务证据单元测试 | 12 项通过 |
+| 独立 master、`/test_ag/*` 假车端集成测试 | 22 项通过，0 errors / 0 failures |
+| 对照用户车端 ZIP 真实纯逻辑代码 | 30 项兼容检查通过，结果见 [兼容基线](validation/vehicle_source_compatibility.json) |
 | Command MD5 | `b574bb9bb1240c0d2ae262d6c3feb2bf`，与接口 V1 一致 |
 | install 环境 Python 导入、CLI `--help` | 通过，确认导入 install 路径 |
 | Python 编译、Git 空白检查 | 通过 |
@@ -27,6 +29,14 @@ catkin_make run_tests_ag_client -j2
 catkin_test_results build/test_results/ag_client
 ```
 
-有效用例数是 18 + 17 = **35**；Catkin 汇总还可能计入 rostest 外层测试进程，不把它重复计为业务用例。测试 XML 在 `~/catkin_ws/build/test_results/ag_client/`，结果不提交为源码。
+有效自动测试数是 18 + 12 + 22 = **52**；Catkin 汇总还可能计入 rostest 外层测试进程，不把它重复计为业务用例。测试 XML 在 `~/catkin_ws/build/test_results/ag_client/`。新增覆盖取消中阶段、本端执行健康门禁与停止请求通道、旧/新transport_error、只读CLI及任务归属/静止窗口证据。
 
-尚未验证：真实采点文件/原 SDK 保存请求格式、真实车端状态机、电台双机 FKIE 链路与射频工况、底盘运动和到达精度。测试仅验证本客户端，不复用原接口文档中车端的 429 项结论。最终实车完成仍须原车端的 Action、停车窗口和地理复核证据。
+30项独立兼容检查通过动态导入外部源码运行，不复制车端实现到本包；检查正式消息定义、实际 capture_target 输出、双方请求文件保存/加载、五类命令映射/序列化、真实 TaskCore 受理/去重及取消阶段。复现：
+
+```bash
+source ~/catkin_ws/devel/setup.bash
+python3 ~/catkin_ws/src/AG_Client/ag_client/test/check_vehicle_compat.py \
+  --vehicle-root /absolute/path/to/extracted/Online_Navigation_with_RTK
+```
+
+该脚本不初始化 ROS，不访问网络或硬件，不写车端源码。52项客户端测试和30项源码兼容检查分别报告，不冒充车端全回归。尚未验证：实机采点、真实车端 ROS 进程及部署版本、电台双机 FKIE 链路与射频工况、底盘运动和到达精度；也未在本机运行原车端整套 ROS 集成测试。不复用原接口文档中车端429项结论。

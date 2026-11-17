@@ -7,6 +7,9 @@
   <license>Proprietary</license>
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>
+  <depend>roscpp</depend>
+  <depend>jsoncpp</depend>
+  <depend>openssl</depend>
   <depend>std_msgs</depend>
   <depend>slicer_air_ground_msgs</depend>
   <test_depend>rostest</test_depend>

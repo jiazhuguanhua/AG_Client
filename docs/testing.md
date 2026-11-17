@@ -1,5 +1,7 @@
 # 本地验证
 
+2026-11-18 C++ 接入增量：完整 maxt/AG_Client 构建通过，既有52项客户端测试仍全部通过；`maxt_pkg/test/qr_ugv_dispatch.test` 的18项跨仓库集成测试通过（0错误/0失败）。真实 QR context+C++ SDK 与假 UGV 通信，BT 仅运行无副作用心跳，不构造 MavKit、不启动生产任务、MAVROS或飞控。覆盖中文日志、坐标/角色/任务门禁、重复心跳、uint64身份/回执、异常JSON、错误任务结果、完整到达证据、超时/重启/无连接、Python/C++共用发送锁及等待期间BT tick持续推进。独立临时工作区 build/install、仅使用 install 的外部 C++ 消费者编译/链接和Python入口检查均通过，未覆盖 maxt 的既有 install 配置。
+
 2026-11-17，ROS Noetic / Python 3.8。未启动硬件、飞控、解锁或起飞，未向真实车辆发送任务。
 
 | 范围 | 结果 |

@@ -1,0 +1,4 @@
+<launch>
+  <!-- rostest owns an isolated master. Only /test_ag/* topics are used. -->
+  <test test-name="ag_client_ros" pkg="ag_client" type="test_client_ros.py" time-limit="100" />
+</launch>

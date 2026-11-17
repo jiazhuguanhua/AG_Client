@@ -1,0 +1,75 @@
+# AG_Client
+
+ROS1 Noetic 空地任务 V1 客户端，按 `air_ground_interface_v1(1).md`（2026-11-15）实现。仓库包含 `ag_client`（Python API / CLI）和 `slicer_air_ground_msgs`（正式消息），不依赖导航、底盘或飞控。目录保留 `AG_Client`，ROS 包名采用小写。
+
+## 构建
+
+```bash
+cd ~/catkin_ws
+source /opt/ros/noetic/setup.bash
+catkin_make --only-pkg-with-deps ag_client -DPYTHON_EXECUTABLE=/usr/bin/python3
+source devel/setup.bash
+rosmsg md5 slicer_air_ground_msgs/Command
+```
+
+MD5 必须为 `b574bb9bb1240c0d2ae262d6c3feb2bf`。同一工作区不得重复安装另一个同名消息源码包。原工作区构建其他包时，使用 `catkin_make -DCATKIN_WHITELIST_PACKAGES=""` 清除选择列表。
+
+## 连接及命令
+
+先按 [电台 / FKIE 配置](docs/fkie_radio.md) 设置网络。默认采用原文档的同一车端 master。运行客户端不会启动硬件、解锁、起飞、启动导航或解除 hold；`set` 等任务命令可能驱动车辆，只由现场人员在原车端准备完成后执行。
+
+```bash
+rosrun ag_client ag_client_cli.py status
+
+# TARGET_FILE 为真实 geographic.py capture 文件的本机路径
+rosrun ag_client ag_client_cli.py set --target-file "$TARGET_FILE" \
+  --save-request /tmp/mission.request.json
+rosrun ag_client ag_client_cli.py replace-via --via-file "$VIA_FILE"
+rosrun ag_client ag_client_cli.py replace-via   # 清空途经点，保留终点
+rosrun ag_client ag_client_cli.py pause
+rosrun ag_client ag_client_cli.py resume
+rosrun ag_client ag_client_cli.py cancel
+rosrun ag_client ag_client_cli.py replay /tmp/mission.request.json
+```
+
+显式坐标：`set --latitude LAT --longitude LON [--altitude-ellipsoid HEIGHT] [--yaw RAD]`。坐标是车体 `base_link` 水平地面投影的 WGS84 位置；高度为椭球高，yaw 为 ENU 东零逆时针弧度。不要传飞机位置/飞行高度或重复做杆臂补偿。`--via-file` 可重复，文件顺序即途经顺序；途经点禁止 yaw。
+
+所有等待选项放在子命令后：`--state-timeout 5 --state-max-age 2 --connect-timeout 3 --receipt-timeout 3`，单位秒，必须为有限正数。`--command-topic`、`--state-topic` 支持隔离测试的重命名，实际使用保持默认正式 topic。
+
+退出码：`0` 收到明确受理（status 为获取新鲜状态）；`1` 车端明确拒绝；`2` 本地输入/传输/回执异常。**回执超时可能已执行**，会打印原请求；先读状态，再按需 replay 保存文件。保存必须使用新路径，拒绝覆盖；不要编辑已保存请求后重放。
+
+## Python 接入
+
+```python
+import rospy
+from ag_client import load_target
+from ag_client.client import AirGroundClient, CommandRejected, OutcomeUnknown
+
+rospy.init_node('air_ground_client')
+with AirGroundClient() as client:
+    state = client.status()  # 完整最新快照，保持车端执行证据
+    goal = load_target(target_file)  # 调用者传入真实采点路径
+    try:
+        receipt = client.set_task(goal, save_path=new_request_path)
+    except CommandRejected as exc:
+        handle_rejection(exc.receipt)
+    except OutcomeUnknown as exc:
+        record_unknown(exc.request)  # 不自动重试、取消或生成新 SET
+```
+
+`set_task(final_goal, via_points=None, save_path=None)`、`replace_via_points(points, save_path=None)`、`pause/resume/cancel(save_path=None)`、`replay(request)` 均返回匹配身份的回执字典；`status()` 返回状态字典。用 `point(latitude, longitude, altitude_ellipsoid_m=None, yaw=None)` 构造显式地面坐标，`load_request(path)` 读取保存请求。异常区分见 [协议与限制](docs/protocol.md)。
+
+命令非锁存、队列 1、每次调用只发布一次。新命令读取新鲜状态分配全局序号；相同主机、用户、master/topic 的发送操作互斥。跨主机无法由本地锁仲裁，飞机端仍必须保留唯一串行出口，人工命令也通过该出口协调。断网不自动取消，车端可继续最后任务。
+
+`accepted=true` 表示受理。最终完成看同任务 `phase=COMPLETED`、`last_task_result`，以及 Action 成功、停车窗口和地理复核全部通过；客户端不把受理当作到达。
+
+## 验证
+
+```bash
+cd ~/catkin_ws
+source devel/setup.bash
+catkin_make run_tests_ag_client
+catkin_test_results build/test_results/ag_client
+```
+
+测试只启动假车端、独立 ROS master 和测试 topic；不启动飞行或真实车辆。范围、结果和未验证项见 [测试记录](docs/testing.md)。

@@ -1,0 +1,30 @@
+<launch>
+  <!-- Both sides run this on their OWN master. Never run two sync paths. -->
+  <arg name="local_name" />
+  <arg name="peer_name" />
+  <arg name="peer_ip" />
+  <arg name="multicast" default="false" />
+  <arg name="sync_remote_nodes" default="false" />
+  <arg name="discovery_port" default="11511" />
+  <arg name="rpc_port" default="11611" />
+
+  <node pkg="fkie_master_discovery" type="master_discovery"
+        name="ag_master_discovery" output="screen" required="true">
+    <param name="name" value="$(arg local_name)" />
+    <param name="mcast_group" value="226.0.0.0" />
+    <param name="mcast_port" value="$(arg discovery_port)" />
+    <param name="rpc_port" value="$(arg rpc_port)" />
+    <param name="send_mcast" value="$(arg multicast)" />
+    <param name="listen_mcast" value="$(arg multicast)" />
+    <param name="heartbeat_hz" value="1.0" />
+    <param name="rosmaster_hz" value="1.0" />
+    <rosparam param="robot_hosts" subst_value="true">['$(arg peer_ip)']</rosparam>
+  </node>
+
+  <node pkg="fkie_master_sync" type="master_sync"
+        name="ag_master_sync" output="screen" required="true">
+    <rosparam command="load" file="$(find ag_client)/config/fkie_sync.yaml" />
+    <rosparam param="sync_hosts" subst_value="true">['$(arg peer_name)']</rosparam>
+    <param name="sync_remote_nodes" value="$(arg sync_remote_nodes)" />
+  </node>
+</launch>

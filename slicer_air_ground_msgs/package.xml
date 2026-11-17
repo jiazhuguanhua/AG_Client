@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>slicer_air_ground_msgs</name>
+  <version>1.0.0</version>
+  <description>Wire-compatible air-ground V1 messages, documented MD5 verified.</description>
+  <maintainer email="jiazhuguanhua@users.noreply.github.com">Codex</maintainer>
+  <license>Proprietary</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+</package>

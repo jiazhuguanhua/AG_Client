@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ag_client</name>
+  <version>0.1.0</version>
+  <description>ROS Noetic air-ground V1 command client.</description>
+  <maintainer email="jiazhuguanhua@users.noreply.github.com">Codex</maintainer>
+  <license>Proprietary</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>slicer_air_ground_msgs</depend>
+  <test_depend>rostest</test_depend>
+  <test_depend>python3-nose</test_depend>
+</package>

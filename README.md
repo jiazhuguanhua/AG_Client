@@ -22,6 +22,8 @@ MD5 必须为 `b574bb9bb1240c0d2ae262d6c3feb2bf`。同一工作区不得重复�
 
 先按 [电台 / FKIE 配置](docs/fkie_radio.md) 设置网络。默认采用原文档的同一车端 master。运行客户端不会启动硬件、解锁、起飞、启动导航或解除 hold；`set` 等任务命令可能驱动车辆，只由现场人员在原车端准备完成后执行。
 
+在 UAV 电脑上沿用已打通的 FKIE 环境，运行 `rosrun ag_client ag_client_test_menu.py` 打开地面测试菜单。先选 **1 健康检查**，再选 **3 发送目标**，输入现场测得的 WGS84 纬度和经度，核对后键入 `set`。收到回执后，可用 **4 查询任务**输入回执中的 task_id。菜单也支持查看状态、暂停、恢复和取消，每条修改车端状态的操作都需要单独确认。请求保存路径和车端回执会显示在终端。
+
 ```bash
 rosrun ag_client ag_client_cli.py status
 rosrun ag_client ag_client_cli.py health

@@ -81,3 +81,14 @@ source devel/setup.bash
 ```
 
 隔离联调自建 loopback ROS master，用车端执行器和模拟导航验证，不启动飞行或底盘节点。
+
+## UGV Compose 服务
+
+`deploy/ugv/compose.yaml` 将 V2 任务节点、FKIE discovery 和 sync 放进一个 host 网络服务，复用 UGV 原 master。使用前设置 `AG_UID`、`AG_GID`、`AG_RTK_ROOT`、`AG_NORTK_ROOT`、`AG_OVERLAY_ROOT`。overlay 须已安装，并建好 `runtime/`。服务的原车目录和安装产物只读挂载，ROS 日志落到 overlay 内的 `runtime/.ros`。
+
+Compose 默认只发布状态，`reason: MONITOR_ONLY`，不订阅任务命令，也不连接导航和停车控制。需要正式接收车辆任务时，由现场单独决定启用执行模式。旧 FKIE 停用后可启动此服务，避免端口冲突。
+
+```bash
+docker compose -f deploy/ugv/compose.yaml up -d
+docker logs -f ugv-ag-v2
+```

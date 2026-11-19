@@ -60,7 +60,9 @@ rostopic echo -n 1 /air_ground/v2/state
 rostopic echo -n 1 /air_ground/v2/uav_state
 ```
 
-车端具备行驶条件后，在 UAV 端发任务。经纬度变量填现场实测的可通行点：
+UAV 端手工联调使用 `rosrun ag_uav_client test_menu.py`。菜单可分别读取 UAV、UGV 的一帧新鲜状态，并交互执行 V2 的七个动作。发送后打印一帧 UGV 状态，按 `last_command` 判断车端是否受理。菜单和命令行都通过 `uav.launch` 中的 gateway 发送。
+
+车端具备行驶条件后，也可用 `v2_send.py` 在脚本中下发单条命令。经纬度变量填现场实测的可通行点：
 
 ```bash
 rosrun ag_uav_client v2_send.py SET_TARGET run-01 --lat "$TARGET_LAT" --lon "$TARGET_LON"

@@ -13,7 +13,7 @@ target_link_libraries(ag_client_cpp ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} Ope
 add_dependencies(ag_client_cpp ${catkin_EXPORTED_TARGETS})
 install(TARGETS ag_client_cpp ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION} LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
 install(DIRECTORY include/ag_client/ DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/ag_client)
-catkin_install_python(PROGRAMS scripts/ag_client_cli.py scripts/test_menu.py
+catkin_install_python(PROGRAMS scripts/test_menu.py
   scripts/ag_uav_gateway.py scripts/v2_send.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY ../docs DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
@@ -21,6 +21,4 @@ install(DIRECTORY launch config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(test/test_protocol.py)
   catkin_add_nosetests(test/test_observation.py)
-  find_package(rostest REQUIRED)
-  add_rostest(test/client.test)
 endif()

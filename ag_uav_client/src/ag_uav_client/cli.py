@@ -2,32 +2,11 @@
 import argparse
 import json
 import math
-import signal
 import sys
 
 from .protocol import ProtocolError, point, load_target, load_request
 
-
-class _InitializationTimeout(BaseException):
-    # rospy registration catches Exception internally; bypass that catch so the
-    # alarm cannot be swallowed and leave initialization waiting forever.
-    pass
-
-
-def _init_ros(rospy, timeout):
-    """Bound ROS registration as well as state waiting (Noetic on Linux)."""
-    def expired(*_):
-        raise _InitializationTimeout()
-
-    old = signal.signal(signal.SIGALRM, expired)
-    signal.setitimer(signal.ITIMER_REAL, timeout)
-    try:
-        rospy.init_node('ag_client', anonymous=True)
-    except _InitializationTimeout:
-        raise TimeoutError('ROS initialization timed out; check ROS_MASTER_URI and local node address') from None
-    finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, old)
+from .ros_runtime import init_ros as _init_ros
 
 
 def parser():

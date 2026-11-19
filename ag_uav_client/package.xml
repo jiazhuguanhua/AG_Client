@@ -15,6 +15,5 @@
   <exec_depend>fkie_master_discovery</exec_depend>
   <exec_depend>fkie_master_sync</exec_depend>
   <depend>slicer_air_ground_msgs</depend>
-  <test_depend>rostest</test_depend>
   <test_depend>python3-nose</test_depend>
 </package>

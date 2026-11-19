@@ -20,7 +20,7 @@
 
 集成测试覆盖五类命令和空途经点、消息序列化及默认负载、请求保存且不覆盖、原样 replay/duplicate、非锁存且重连不重放、旧 boot 拒绝、未来/过期/坏 JSON/停止反馈、无订阅者不发布、回执身份匹配、明确拒绝、回执超时后仅发一次且不取消、发布后接收端重启、跨客户端本地发送锁、CLI 的 0/1/2 退出码及无 master 有界退出。
 
-复现时使用独立环境，避免继承真实车端 master：
+当前版本已从默认测试中移除 V1 ROS 端到端用例。以下命令只运行仍保留的 V1 协议与状态纯逻辑检查：
 
 ```bash
 cd ~/catkin_ws
@@ -33,7 +33,7 @@ catkin_make run_tests_ag_uav_client -j2
 catkin_test_results build/test_results/ag_uav_client
 ```
 
-有效自动测试数是 18 + 12 + 22 = **52**；Catkin 汇总还可能计入 rostest 外层测试进程，不把它重复计为业务用例。测试 XML 在 `~/catkin_ws/build/test_results/ag_client/`。新增覆盖取消中阶段、本端执行健康门禁与停止请求通道、旧/新transport_error、只读CLI及任务归属/静止窗口证据。
+历史版本曾运行 18 + 12 + 22 = **52 项**有效测试；其中 22 项来自现已退役的 V1 ROS 测试入口。测试 XML 在 `~/catkin_ws/build/test_results/ag_client/`。新增覆盖取消中阶段、本端执行健康门禁与停止请求通道、旧/新transport_error、只读CLI及任务归属/静止窗口证据。
 
 30项独立兼容检查通过动态导入外部源码运行，不复制车端实现到本包；检查正式消息定义、实际 capture_target 输出、双方请求文件保存/加载、五类命令映射/序列化、真实 TaskCore 受理/去重及取消阶段。复现：
 

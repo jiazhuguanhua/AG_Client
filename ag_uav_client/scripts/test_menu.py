@@ -1,122 +1,122 @@
 #!/usr/bin/env python3
-"""Interactive V1 wire tester for the UAV terminal."""
-import math
+"""Interactive V2 tester. All commands go through the running UAV gateway."""
 import threading
 import time
 import uuid
 
 import rosgraph
 import rospy
-from slicer_air_ground_msgs.msg import Command
 from std_msgs.msg import String
 
-from ag_uav_client.cli import _init_ros
-from ag_uav_client.client import to_message
-from ag_uav_client.protocol import loads_json, point
+from ag_uav_client.ros_runtime import init_ros, publish_intent
+from ag_uav_client.v2 import INTENT, STATE, UAV_STATE, decode, number
 
-STATE_TOPIC = '/air_ground/state'
-COMMAND_TOPIC = '/air_ground/command'
-OPERATIONS = {'2': 'SET_TASK', '3': 'PAUSE', '4': 'RESUME', '5': 'CANCEL'}
+OPERATIONS = {
+    '2': 'SET_TARGET', '3': 'INSERT_MVP', '4': 'DEL_MVP', '5': 'UPDATE_MVP',
+    '6': 'PAUSE', '7': 'RESUME', '8': 'STOP',
+}
+TOPICS = {'ugv': STATE, 'uav': UAV_STATE}
+MENU = ('\n1 读 UGV 状态  2 设置/更新终点  3 插入 MVP  4 删除 MVP  5 更新 MVP\n'
+        '6 暂停         7 恢复            8 停止任务  9 读 UAV 状态  0 退出')
 
 
 class StateReader:
     def __init__(self):
         self.changed = threading.Condition()
-        self.frame = None
+        self.frames = {}
         self.counter = 0
-        self.subscriber = rospy.Subscriber(STATE_TOPIC, String, self.receive, queue_size=1)
+        self.subscribers = [
+            rospy.Subscriber(topic, String, self.receive, callback_args=vehicle, queue_size=1)
+            for vehicle, topic in TOPICS.items()
+        ]
 
-    def receive(self, message):
+    def receive(self, message, vehicle):
         try:
-            state = loads_json(message.data)
-            stamp = state['updated_stamp']
-            if type(stamp) not in (int, float) or not math.isfinite(stamp) or stamp <= 0:
-                return
-        except (ValueError, TypeError, KeyError, OverflowError):
+            state = decode(message.data)
+        except ValueError:
+            return
+        stamp = state.get('updated_at')
+        if (state.get('version') != 2 or state.get('vehicle_id') != vehicle
+                or not number(stamp) or stamp <= 0):
             return
         with self.changed:
             self.counter += 1
-            self.frame = (self.counter, time.monotonic(), state, message.data)
+            self.frames[vehicle] = (self.counter, state, message.data)
             self.changed.notify_all()
 
-    def fresh_frame(self, after=None):
-        deadline = time.monotonic() + 5.0
+    def fresh_frame(self, vehicle):
+        deadline = time.monotonic() + 5.
         with self.changed:
-            if after is None:
-                after = self.counter
+            after = self.counter
             while not rospy.is_shutdown():
-                now = time.monotonic()
-                if self.frame:
-                    counter, received, state, raw = self.frame
-                    age = rospy.Time.now().to_sec() - state['updated_stamp']
-                    if counter > after and now - received <= 2.0 and 0 <= age <= 2.0:
+                frame = self.frames.get(vehicle)
+                if frame:
+                    counter, state, raw = frame
+                    age = rospy.Time.now().to_sec() - state['updated_at']
+                    if counter > after and 0 <= age <= 2.:
                         return state, raw
-                if now >= deadline:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
                     break
-                self.changed.wait(min(0.1, deadline - now))
-        raise TimeoutError(f'5 秒内没有读到 {STATE_TOPIC} 的新鲜帧')
+                self.changed.wait(min(.1, remaining))
+        raise TimeoutError(f'5 秒内没有读到 {TOPICS[vehicle]} 的新鲜帧')
 
 
-def send(publisher, reader, operation, goal, task_id):
-    deadline = time.monotonic() + 3.0
-    while not publisher.get_num_connections():
-        if rospy.is_shutdown() or time.monotonic() >= deadline:
-            raise TimeoutError(f'{COMMAND_TOPIC} 没有连接的订阅者，本次未发布')
-        time.sleep(0.05)
-
-    state, _ = reader.fresh_frame()
-    request = {
-        'protocol_version': 1,
-        'server_id': state['server_id'],
-        'sequence': (state['last_sequence'] or 0) + 1,
-        'request_id': str(uuid.uuid4()),
-        'task_id': task_id or (str(uuid.uuid4()) if goal is not None else state['task_id']),
-        'operation': operation,
-        'final_goal': goal,
-        'via_points': [],
-    }
-    message = to_message(request)
-    with reader.changed:
-        after = reader.counter
-        publisher.publish(message)
-    print(f'已发布一条 {operation} · seq={message.sequence} · '
-          f'request_id={message.request_id} · task_id={message.task_id}', flush=True)
-    try:
-        _, raw = reader.fresh_frame(after)
-        print(f'{STATE_TOPIC} 发布后收到的一帧（不等同于回执）')
-        print(raw, flush=True)
-    except TimeoutError as exc:
-        print(f'命令已发布，{exc}。')
+def read_intent(operation, last_task):
+    default = last_task or ('run-' + uuid.uuid4().hex[:12] if operation == 'SET_TARGET' else '')
+    task = input(f'任务 ID（回车使用 {default or "无默认值"}）> ').strip() or default
+    if not task:
+        raise ValueError('请填写任务 ID')
+    intent = dict(op=operation, task_id=task)
+    if operation in ('INSERT_MVP', 'DEL_MVP', 'UPDATE_MVP'):
+        intent['mvp_id'] = input('MVP ID > ').strip()
+    if operation == 'INSERT_MVP':
+        before = input('插在这个 MVP ID 前（回车追加到终点前）> ').strip()
+        if before:
+            intent['before_id'] = before
+    if operation in ('SET_TARGET', 'INSERT_MVP', 'UPDATE_MVP'):
+        lat = float(input('WGS84 纬度 > '))
+        lon = float(input('WGS84 经度 > '))
+        intent['target' if operation == 'SET_TARGET' else 'point'] = dict(lat=lat, lon=lon)
+    return intent
 
 
 def main():
-    _init_ros(rospy, 5.0)
+    init_ros(rospy, name='ag_v2_test_menu')
     reader = StateReader()
-    publisher = rospy.Publisher(COMMAND_TOPIC, Command, queue_size=1, latch=False)
-    print(f'UAV → UGV 话题测试 · {rosgraph.get_master_uri()}')
-    print('选发送或任务操作会直接发布给真车。请只输入现场可用目标。')
+    publisher = rospy.Publisher(INTENT, String, queue_size=1, latch=False)
+    print(f'UAV → UGV V2 测试 · {rosgraph.get_master_uri()}')
+    print('发送操作将提交给 UAV gateway，可能使已就绪的小车行驶。')
+    last_task = None
     while not rospy.is_shutdown():
-        print('\n1 读一帧状态  2 发送目标  3 暂停  4 恢复  5 取消  0 退出')
+        print(MENU)
         choice = input('选择 > ').strip()
         if choice == '0':
             return
+
+        vehicle = 'uav' if choice == '9' else 'ugv'
         try:
-            if choice == '1':
-                _, raw = reader.fresh_frame()
-                print(raw, flush=True)
-            elif choice in OPERATIONS:
-                goal, task_id = None, None
-                if choice == '2':
-                    lat = float(input('WGS84 纬度 > '))
-                    lon = float(input('WGS84 经度（回车发送） > '))
-                    goal = point(lat, lon)
-                else:
-                    task_id = input('task_id（回车使用车端状态中的任务并发送） > ').strip()
-                send(publisher, reader, OPERATIONS[choice], goal, task_id)
-            else:
+            if choice in OPERATIONS:
+                operation = OPERATIONS[choice]
+                intent = read_intent(operation, last_task)
+                publish_intent(rospy, publisher, intent)
+                last_task = intent['task_id']
+                print(f'已向本机 gateway 提交 {operation} · {last_task}')
+                print('随后打印一帧 UGV 状态。受理结果见匹配的 last_command。')
+            elif choice not in ('1', '9'):
                 print('请选择菜单中的编号。')
-        except (ValueError, KeyError, TypeError, TimeoutError, rospy.ROSException) as exc:
-            print(f'操作失败：{exc}', flush=True)
+                continue
+            state, raw = reader.fresh_frame(vehicle)
+            print(raw, flush=True)
+            if vehicle == 'ugv':
+                phase, task = state.get('phase'), state.get('task_id')
+                if phase in ('STOPPED', 'COMPLETED') and task == last_task:
+                    last_task = None
+                elif (choice == '1' and isinstance(task, str) and task
+                      and phase not in ('STOPPED', 'COMPLETED')):
+                    last_task = task
+        except (ValueError, TimeoutError, rospy.ROSException) as exc:
+            print(f'操作提示：{exc}', flush=True)
 
 
 if __name__ == '__main__':

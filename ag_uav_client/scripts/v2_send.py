@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Send one local V2 route intent to the UAV gateway."""
 import argparse
-import json
 import time
 
 import rospy
 from std_msgs.msg import String
 
-from ag_uav_client.cli import _init_ros
+from ag_uav_client.ros_runtime import init_ros, publish_intent
 from ag_uav_client.v2 import INTENT, OPERATIONS, validate
 
 
@@ -28,17 +27,12 @@ def main():
     if args.before_id is not None:
         command['before_id'] = args.before_id
     try:
-        payload = json.dumps(validate(command, wire=False), allow_nan=False)
+        validate(command, wire=False)
     except ValueError as exc:
         parser.error(str(exc))
-    _init_ros(rospy, 5.)
+    init_ros(rospy, name='ag_v2_send')
     publisher = rospy.Publisher(INTENT, String, queue_size=1, latch=False)
-    deadline = time.monotonic() + 3.
-    while not publisher.get_num_connections():
-        if rospy.is_shutdown() or time.monotonic() >= deadline:
-            raise SystemExit('UAV gateway is not connected')
-        time.sleep(.05)
-    publisher.publish(String(data=payload))
+    publish_intent(rospy, publisher, command)
     time.sleep(.2)
     print('一次意图已提交给 UAV gateway，请看 UAV/UGV state。')
 

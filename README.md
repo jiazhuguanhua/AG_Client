@@ -1,5 +1,10 @@
 # AG_Client
 
+
+**简化协议 V2** 支持持续刷新终点、按 MVP ID 插入/删除/更新及暂停、恢复、停止。UAV 用 `roslaunch ag_client uav.launch`，UGV 用 `roslaunch ag_ugv_task ugv.launch`。两端 FKIE 选择 `protocol_v2:=true`。启动、字段、车端依赖及测试见 [V2 协议与部署](docs/protocol_v2.md)。
+
+下面保留 V1 的用法，供现有 maxt 和测试菜单继续使用。
+
 ROS1 Noetic 空地任务 V1 客户端，按 `air_ground_interface_v1(1).md`（2026-11-15）实现。仓库包含 `ag_client`（Python API / CLI）和 `slicer_air_ground_msgs`（正式消息），不依赖导航、底盘或飞控。目录保留 `AG_Client`，ROS 包名采用小写。
 
 C++ 应用可链接公共库 `ag_client_cpp`，用于单个地面目标的异步派车与回执/完成日志；见 [C++ 客户端](docs/cpp_client.md)。不需要新增代理 topic 或代理进程。

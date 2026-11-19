@@ -2,7 +2,7 @@
 <package format="2">
   <name>ag_client</name>
   <version>0.1.0</version>
-  <description>ROS Noetic air-ground V1 command client.</description>
+  <description>ROS Noetic air-ground client and V2 UAV gateway.</description>
   <maintainer email="jiazhuguanhua@users.noreply.github.com">Codex</maintainer>
   <license>Proprietary</license>
   <buildtool_depend>catkin</buildtool_depend>
@@ -11,6 +11,7 @@
   <depend>jsoncpp</depend>
   <depend>openssl</depend>
   <depend>std_msgs</depend>
+  <exec_depend>sensor_msgs</exec_depend>
   <depend>slicer_air_ground_msgs</depend>
   <test_depend>rostest</test_depend>
   <test_depend>python3-nose</test_depend>

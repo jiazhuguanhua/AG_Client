@@ -1,5 +1,7 @@
 # 自组网电台与 FKIE
 
+本页示例默认 V1。使用 [V2](protocol_v2.md) 时，两端都加 `protocol_v2:=true`，同步 V2 命令及 UAV、UGV 状态，UAV 本地 intent 不跨机。
+
 ## 选型
 
 电台若提供双向 IP 网络，FKIE 适合保留 UAV/UGV 各自 ROS master，并只共享本任务的两个 topic；它同步 ROS 注册信息，消息仍经 TCPROS 直接传输，不会改善电台丢包或自动压缩。若只需当前空地任务接口，先用原说明的**同一车端 master**最快；已在用双 master 时再用 FKIE。串口透明数传、NAT 后仅开放单端口、频繁断连或高丢包窄带链路，应改用专用网关。

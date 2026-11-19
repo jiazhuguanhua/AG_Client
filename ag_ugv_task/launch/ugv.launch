@@ -1,0 +1,8 @@
+<launch>
+  <arg name="action" default="/ugv/move_base"/>
+  <arg name="via_pass_radius_m" default="0.25"/>
+  <node pkg="ag_ugv_task" type="ag_ugv_task_node.py" name="ag_ugv_task" output="screen" required="true">
+    <param name="action" value="$(arg action)"/>
+    <param name="via_pass_radius_m" value="$(arg via_pass_radius_m)" type="double"/>
+  </node>
+</launch>

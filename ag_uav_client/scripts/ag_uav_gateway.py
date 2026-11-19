@@ -8,7 +8,7 @@ import rospy
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import String
 
-from ag_client.v2 import (
+from ag_uav_client.v2 import (
     COMMAND, INTENT, UAV_STATE, coordinates, decode, snapshot, validate, vehicle_position,
 )
 

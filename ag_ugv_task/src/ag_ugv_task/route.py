@@ -2,7 +2,7 @@
 import copy
 import uuid
 
-from ag_client.v2 import validate
+from ag_uav_client.v2 import validate
 
 EDIT = {'SET_TARGET', 'INSERT_MVP', 'DEL_MVP', 'UPDATE_MVP'}
 ENDED = {'IDLE', 'COMPLETED', 'CANCELED'}

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(ag_client)
+project(ag_uav_client)
 find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs slicer_air_ground_msgs)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP REQUIRED jsoncpp)
@@ -12,7 +12,7 @@ target_include_directories(ag_client_cpp PUBLIC include ${catkin_INCLUDE_DIRS} P
 target_link_libraries(ag_client_cpp ${catkin_LIBRARIES} ${JSONCPP_LIBRARIES} OpenSSL::Crypto)
 add_dependencies(ag_client_cpp ${catkin_EXPORTED_TARGETS})
 install(TARGETS ag_client_cpp ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION} LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION})
-install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
+install(DIRECTORY include/ag_client/ DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/ag_client)
 catkin_install_python(PROGRAMS scripts/ag_client_cli.py scripts/test_menu.py
   scripts/ag_uav_gateway.py scripts/v2_send.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

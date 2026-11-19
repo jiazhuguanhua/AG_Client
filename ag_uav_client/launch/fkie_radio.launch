@@ -3,7 +3,6 @@
   <arg name="local_name" />
   <arg name="peer_name" />
   <arg name="peer_ip" />
-  <arg name="protocol_v2" default="false" />
   <arg name="multicast" default="false" />
   <arg name="sync_remote_nodes" default="false" />
   <arg name="discovery_port" default="11511" />
@@ -24,10 +23,7 @@
 
   <node pkg="fkie_master_sync" type="master_sync"
         name="ag_master_sync" output="screen" required="true">
-    <rosparam command="load" file="$(find ag_client)/config/fkie_sync.yaml" />
-    <rosparam if="$(arg protocol_v2)" param="sync_topics">
-      [/air_ground/v2/command, /air_ground/v2/state, /air_ground/v2/uav_state]
-    </rosparam>
+    <rosparam command="load" file="$(find ag_uav_client)/config/fkie_sync.yaml" />
     <rosparam param="sync_hosts" subst_value="true">['$(arg peer_name)']</rosparam>
     <param name="sync_remote_nodes" value="$(arg sync_remote_nodes)" />
   </node>

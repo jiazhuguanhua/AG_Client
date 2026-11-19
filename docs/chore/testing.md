@@ -1,4 +1,6 @@
-# 本地验证
+# 历史验证记录
+
+本文记录 V1 客户端和 maxt 接入时的测试结果。当前 V2 的验证步骤见 [实现与操作指南](../implementation_guide.md)。
 
 2026-11-18 C++ 接入增量：完整 maxt/AG_Client 构建通过，既有52项客户端测试仍全部通过；`maxt_pkg/test/qr_ugv_dispatch.test` 的18项跨仓库集成测试通过（0错误/0失败）。真实 QR context+C++ SDK 与假 UGV 通信，BT 仅运行无副作用心跳，不构造 MavKit、不启动生产任务、MAVROS或飞控。覆盖中文日志、坐标/角色/任务门禁、重复心跳、uint64身份/回执、异常JSON、错误任务结果、完整到达证据、超时/重启/无连接、Python/C++共用发送锁及等待期间BT tick持续推进。独立临时工作区 build/install、仅使用 install 的外部 C++ 消费者编译/链接和Python入口检查均通过，未覆盖 maxt 的既有 install 配置。
 
@@ -23,12 +25,12 @@
 ```bash
 cd ~/catkin_ws
 source /opt/ros/noetic/setup.bash
-catkin_make --only-pkg-with-deps ag_client -DPYTHON_EXECUTABLE=/usr/bin/python3 -j2
+catkin_make --only-pkg-with-deps ag_uav_client -DPYTHON_EXECUTABLE=/usr/bin/python3 -j2
 source devel/setup.bash
 export ROS_MASTER_URI=http://127.0.0.1:11379 ROS_IP=127.0.0.1
 unset ROS_HOSTNAME
-catkin_make run_tests_ag_client -j2
-catkin_test_results build/test_results/ag_client
+catkin_make run_tests_ag_uav_client -j2
+catkin_test_results build/test_results/ag_uav_client
 ```
 
 有效自动测试数是 18 + 12 + 22 = **52**；Catkin 汇总还可能计入 rostest 外层测试进程，不把它重复计为业务用例。测试 XML 在 `~/catkin_ws/build/test_results/ag_client/`。新增覆盖取消中阶段、本端执行健康门禁与停止请求通道、旧/新transport_error、只读CLI及任务归属/静止窗口证据。
@@ -37,7 +39,7 @@ catkin_test_results build/test_results/ag_client
 
 ```bash
 source ~/catkin_ws/devel/setup.bash
-python3 ~/catkin_ws/src/AG_Client/ag_client/test/check_vehicle_compat.py \
+python3 ~/catkin_ws/src/AG_Client/ag_uav_client/test/check_vehicle_compat.py \
   --vehicle-root /absolute/path/to/extracted/Online_Navigation_with_RTK
 ```
 

@@ -1,4 +1,6 @@
-# 协议与边界
+# V1 协议与边界
+
+本文归档旧空地协议的字段、校验和兼容约定。当前使用 [V2 协议](../protocol_v2.md)。
 
 - 默认命令 `/air_ground/command`，正式 `slicer_air_ground_msgs/Command`，非锁存队列 1；反馈 `/air_ground/state`，`std_msgs/String` JSON。
 - V1、当前 `server_id`、正 uint64 全局递增序号、UUID 请求身份。SET 分配新任务身份，其余操作指向当前未结束任务。暂停期间更新仍由车端保持暂停。

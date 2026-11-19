@@ -6,7 +6,7 @@
   <maintainer email="jiazhuguanhua@users.noreply.github.com">Codex</maintainer>
   <license>Proprietary</license>
   <buildtool_depend>catkin</buildtool_depend>
-  <depend>ag_client</depend>
+  <depend>ag_uav_client</depend>
   <depend>roslib</depend>
   <depend>rospy</depend>
   <depend>std_msgs</depend>

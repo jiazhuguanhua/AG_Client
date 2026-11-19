@@ -1,6 +1,6 @@
 # 空地任务 V2
 
-UAV 和 UGV 都从 AG_Client 构建。UAV 的 `ag_client` 发送命令和飞机状态，UGV 的 `ag_ugv_task` 保存路线并驱动已有导航。两个节点各上各自的 ROS master。协议按状态快照工作，不需要查询服务、命令前读取状态或逐条等待回执。
+本文定义空地任务 V2 的命令、执行语义和状态字段。UAV 的 `ag_uav_client` 发送命令和飞机状态，UGV 的 `ag_ugv_task` 保存路线并驱动已有导航。两个节点各上各自的 ROS master。协议按状态快照工作，不需要查询服务、命令前读取状态或逐条等待回执。
 
 ## 话题
 
@@ -11,7 +11,7 @@ UAV 和 UGV 都从 AG_Client 构建。UAV 的 `ag_client` 发送命令和飞机�
 | `/air_ground/v2/state` | `std_msgs/String` JSON | UGV → UAV |
 | `/air_ground/v2/uav_state` | `std_msgs/String` JSON | UAV → UGV |
 
-两端 FKIE 加 `protocol_v2:=true`，只同步后三项。已运行 FKIE 时在两边一起切换现有实例的配置，不叠加第二套。V1 与 V2 话题隔离，正常联调只运行一个车端任务接口，避免两个执行器竞争 `move_base`。旧 maxt 和 `test_menu.py` 仍发 V1，当前不会自动转换为 V2。
+默认 FKIE 只同步后三项。本地 intent 留在 UAV。部署和话题验收见 [实现与操作指南](implementation_guide.md)。
 
 ## 命令
 
@@ -45,41 +45,3 @@ UAV 和 UGV 都从 AG_Client 构建。UAV 的 `ag_client` 发送命令和飞机�
 | `last_command` | `task_id`、`seq`、`op`、`sent_at`、`received_at`、`accepted`、`reason`。UGV 显示最近处理的一条，UAV 只显示最后发布的一条，接受与接收时间在 UAV 上为 null。 |
 
 状态变化时发布，运行平稳时每秒一帧。一次状态快照可能覆盖较早的命令结果。`accepted` 表示车端接受意图；执行进度和完成看 `phase`。两端时钟同步后才可比较收发时间。断网不会让车自动停车。
-
-## 启动与依赖
-
-1. UAV：构建并 source 含 `ag_client` 的工作区。配置现有 FKIE 后运行 `roslaunch ag_client uav.launch`。可通过 `fix_topic:=...` 绑定已有 NavSatFix、`phase_topic:=...` 绑定已有 String 状态。未提供数据源也可发送路线，UAV 状态如实显示未知。launch 仅启动 gateway。
-2. UGV：在**原车工作空间之上的独立 catkin overlay**构建 `ag_ugv_task`，避免在同一个 src 树放两份 `slicer_air_ground_msgs`。运行环境先有原车的 `ugv_navigation`、`ugv_slicer_control`，再 source V2 overlay。保留原来的定位、导航和底盘启动流程。启动 `roslaunch ag_ugv_task ugv.launch` 替代 `./run.sh tasks`。如果车端依赖在 Docker 中构建，就在能访问同一 overlay、原车安装空间和 UGV master 的 host 网络容器里运行新 launch。
-3. 车端 V2 通过原车已安装的 `RosNavigation`、`TaskExecutor` 接现有系统。该适配层在 `/geographic/status` 取配准与测量，使用现有 TF/里程计，向 `/ugv/move_base` 发 Action，通过原 Mux 状态和 `control.py` 管理停车。无需把这些接口同步给 UAV。依赖原车 ZIP 里已有的模块及其安装布局，无需复制车端源码到本仓库。
-
-使用车端原包自带的 Docker 包装脚本时，可以将 V2 overlay 放在原项目根目录下的 `v2_ws/src/AG_Client`（不放进原项目的 `src/`）。在 UGV 宿主机的原项目根目录执行：
-
-```bash
-./run.sh shell bash -c 'set -e
-  cd /workspace/v2_ws
-  catkin_make --only-pkg-with-deps ag_ugv_task -DPYTHON_EXECUTABLE=/usr/bin/python3
-  catkin_make install'
-./run.sh shell bash -c 'source /workspace/v2_ws/install/setup.bash && exec roslaunch ag_ugv_task ugv.launch'
-```
-
-此方式复用原车镜像、host 网络和 UGV master。只运行一个车端任务节点。车端若也在该容器环境内启动 FKIE，使用同一个 V2 overlay；原镜像需要能够找到 FKIE 包。
-
-UAV 手工发送示例。下面变量应是现场实测可通行地点，测试运行命令可能让 UGV 行驶。
-
-```bash
-rosrun ag_client v2_send.py SET_TARGET run-01 --lat "$TARGET_LAT" --lon "$TARGET_LON"
-rosrun ag_client v2_send.py INSERT_MVP run-01 --mvp-id p1 --lat "$MVP_LAT" --lon "$MVP_LON"
-rosrun ag_client v2_send.py PAUSE run-01
-rostopic echo -n 1 /air_ground/v2/state
-```
-
-更新终点时重复 `SET_TARGET run-01`。程序调用可以直接向 UAV 本地 intent 话题发同一 JSON，例如 `{"op":"SET_TARGET","task_id":"run-01","target":{"lat":31.94,"lon":118.78}}`。
-
-## 验证
-
-`catkin_make run_tests_ag_ugv_task` 执行纯路线测试。另有 `ag_ugv_task/test/check_v2_ros.py`，接受原车 `ugv_navigation/scripts` 目录，启动独立 loopback master，用原车 TaskExecutor 和模拟导航验证完整流程。无需接入现场 master 或硬件。
-
-```bash
-source ~/catkin_ws/devel/setup.bash
-/usr/bin/python3 ag_ugv_task/test/check_v2_ros.py /path/to/ugv_navigation/scripts
-```

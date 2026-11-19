@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from ag_client.protocol import (ProtocolError, UINT64_MAX, build_request,
+from ag_uav_client.protocol import (ProtocolError, UINT64_MAX, build_request,
                                 load_request, load_target, loads_json, point,
                                 save_request, validate_request, validate_state)
 

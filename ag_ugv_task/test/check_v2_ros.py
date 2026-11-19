@@ -82,7 +82,7 @@ def run(executor_type):
     import rospy
     from sensor_msgs.msg import NavSatFix
     from std_msgs.msg import String
-    from ag_client.v2 import STATE, UAV_STATE, vehicle_position
+    from ag_uav_client.v2 import STATE, UAV_STATE, vehicle_position
     from ag_ugv_task.node import GroundNode
 
     rospy.init_node('ag_v2_integration_test')
@@ -90,7 +90,7 @@ def run(executor_type):
     ground = GroundNode(backend, executor_type, lambda: vehicle_position(30.5, 118.5, 1.))
     worker = threading.Thread(target=ground.run, daemon=True)
     worker.start()
-    gateway = subprocess.Popen(['rosrun', 'ag_client', 'ag_uav_gateway.py'], start_new_session=True)
+    gateway = subprocess.Popen(['rosrun', 'ag_uav_client', 'ag_uav_gateway.py'], start_new_session=True)
     last = {}
     observed = [0]
     def record(msg, key):
@@ -102,7 +102,7 @@ def run(executor_type):
         return wait_for(lambda: last.get('ugv') if check(last.get('ugv', {})) else None, label)
 
     def send(op, task='line', accepted=True, **options):
-        args = ['rosrun', 'ag_client', 'v2_send.py', op, task]
+        args = ['rosrun', 'ag_uav_client', 'v2_send.py', op, task]
         for key, value in options.items():
             args.extend(['--' + key.replace('_', '-'), str(value)])
         subprocess.run(args, check=True, timeout=10, stdout=subprocess.DEVNULL)

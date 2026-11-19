@@ -1,4 +1,11 @@
 <launch>
+  <arg name="start_fkie" default="true"/>
+  <arg name="uav_ip" default="192.168.10.32"/>
+  <include if="$(arg start_fkie)" file="$(find ag_uav_client)/launch/fkie_radio.launch">
+    <arg name="local_name" value="ugv"/>
+    <arg name="peer_name" value="uav"/>
+    <arg name="peer_ip" value="$(arg uav_ip)"/>
+  </include>
   <arg name="action" default="/ugv/move_base"/>
   <arg name="via_pass_radius_m" default="0.25"/>
   <node pkg="ag_ugv_task" type="ag_ugv_task_node.py" name="ag_ugv_task" output="screen" required="true">

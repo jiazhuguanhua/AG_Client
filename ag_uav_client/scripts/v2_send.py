@@ -7,8 +7,8 @@ import time
 import rospy
 from std_msgs.msg import String
 
-from ag_client.cli import _init_ros
-from ag_client.v2 import INTENT, OPERATIONS, validate
+from ag_uav_client.cli import _init_ros
+from ag_uav_client.v2 import INTENT, OPERATIONS, validate
 
 
 def main():

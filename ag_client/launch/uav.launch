@@ -1,8 +1,0 @@
-<launch>
-  <arg name="fix_topic" default="/uav/fix"/>
-  <arg name="phase_topic" default="/uav/phase"/>
-  <node pkg="ag_client" type="ag_uav_gateway.py" name="ag_uav_gateway" output="screen" required="true">
-    <param name="fix_topic" value="$(arg fix_topic)"/>
-    <param name="phase_topic" value="$(arg phase_topic)"/>
-  </node>
-</launch>

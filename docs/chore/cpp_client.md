@@ -1,4 +1,4 @@
-# C++ 单目标派车客户端
+# V1 C++ 单目标派车客户端
 
 `ag_client_cpp` 是可链接的公共库，不是额外代理节点。当前只封装“提交一个地面目标 SET_TASK＋异步观察”，Python CLI/API 的暂停、恢复、取消、保存重放能力继续保留。
 
@@ -51,4 +51,4 @@ BT 节点 halt/飞行任务中止不会暗中发送 UGV CANCEL。小车通信中
 
 ## 构建依赖
 
-消费者 `find_package(catkin REQUIRED COMPONENTS ag_client ...)`，并链接 `${catkin_LIBRARIES}`；本包导出 `ag_client_cpp` 与头文件。依赖 roscpp、正式消息、JsonCpp 和 OpenSSL Crypto；应用不需要复制 JSON/序号/回执逻辑。
+消费者 `find_package(catkin REQUIRED COMPONENTS ag_uav_client ...)`，并链接 `${catkin_LIBRARIES}`；本包导出 `ag_client_cpp` 与头文件。依赖 roscpp、正式消息、JsonCpp 和 OpenSSL Crypto；应用不需要复制 JSON/序号/回执逻辑。

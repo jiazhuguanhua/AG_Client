@@ -46,14 +46,14 @@ def check_vehicle(vehicle_root):
     # Only explicit source directories are imported. Build/install/runtime
     # artifacts, configuration, logs, recorded observations and credentials are
     # not used.
-    sys.path[:0] = [str(repository / 'ag_client/src'), str(scripts),
+    sys.path[:0] = [str(repository / 'ag_uav_client/src'), str(scripts),
                    str(vehicle_root / 'src/cup_gnss/src')]
     import air_ground as vehicle_cli
     import air_ground_wire as vehicle_wire
     from air_ground_core import TaskCore
     from geographic_goal_core import capture_target
-    from ag_client import protocol
-    from ag_client.client import to_message
+    from ag_uav_client import protocol
+    from ag_uav_client.client import to_message
     from slicer_air_ground_msgs.msg import Command
 
     passed = []

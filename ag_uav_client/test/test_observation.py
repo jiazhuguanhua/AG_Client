@@ -1,8 +1,8 @@
 import copy
 import unittest
 
-from ag_client.observation import execution_problem, task_report
-from ag_client.protocol import ProtocolError
+from ag_uav_client.observation import execution_problem, task_report
+from ag_uav_client.protocol import ProtocolError
 
 
 class ObservationTests(unittest.TestCase):

@@ -1,4 +1,4 @@
 from distutils.core import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
-setup(**generate_distutils_setup(packages=['ag_client'], package_dir={'': 'src'}))
+setup(**generate_distutils_setup(packages=['ag_uav_client'], package_dir={'': 'src'}))

@@ -1,0 +1,15 @@
+<launch>
+  <arg name="start_fkie" default="true"/>
+  <arg name="ugv_ip" default="192.168.10.33"/>
+  <include if="$(arg start_fkie)" file="$(find ag_uav_client)/launch/fkie_radio.launch">
+    <arg name="local_name" value="uav"/>
+    <arg name="peer_name" value="ugv"/>
+    <arg name="peer_ip" value="$(arg ugv_ip)"/>
+  </include>
+  <arg name="fix_topic" default="/uav/fix"/>
+  <arg name="phase_topic" default="/uav/phase"/>
+  <node pkg="ag_uav_client" type="ag_uav_gateway.py" name="ag_uav_gateway" output="screen" required="true">
+    <param name="fix_topic" value="$(arg fix_topic)"/>
+    <param name="phase_topic" value="$(arg phase_topic)"/>
+  </node>
+</launch>

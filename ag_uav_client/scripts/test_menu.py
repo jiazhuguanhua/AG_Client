@@ -10,9 +10,9 @@ import rospy
 from slicer_air_ground_msgs.msg import Command
 from std_msgs.msg import String
 
-from ag_client.cli import _init_ros
-from ag_client.client import to_message
-from ag_client.protocol import loads_json, point
+from ag_uav_client.cli import _init_ros
+from ag_uav_client.client import to_message
+from ag_uav_client.protocol import loads_json, point
 
 STATE_TOPIC = '/air_ground/state'
 COMMAND_TOPIC = '/air_ground/command'

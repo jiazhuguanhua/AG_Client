@@ -11,7 +11,7 @@ import rospkg
 import rospy
 from std_msgs.msg import String
 
-from ag_client.v2 import COMMAND, STATE, decode, number, snapshot, vehicle_position
+from ag_uav_client.v2 import COMMAND, STATE, decode, number, snapshot, vehicle_position
 
 from .route import Route
 

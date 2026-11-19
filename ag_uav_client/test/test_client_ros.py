@@ -17,8 +17,8 @@ import rostest
 from std_msgs.msg import String
 from slicer_air_ground_msgs.msg import Command
 
-from ag_client.client import AirGroundClient, ClientError, CommandRejected, OutcomeUnknown, to_message
-from ag_client.protocol import build_request, load_request, point
+from ag_uav_client.client import AirGroundClient, ClientError, CommandRejected, OutcomeUnknown, to_message
+from ag_uav_client.protocol import build_request, load_request, point
 
 
 def until(predicate, timeout=3.):
@@ -283,7 +283,7 @@ class ClientRosTests(unittest.TestCase):
         self.assertEqual(len(self.server.commands), 1)
 
     def run_cli(self, *arguments):
-        command = [sys.executable, '-m', 'ag_client.cli'] + list(arguments)
+        command = [sys.executable, '-m', 'ag_uav_client.cli'] + list(arguments)
         command += ['--state-topic', self.namespace + '/state',
                     '--command-topic', self.namespace + '/command', '--receipt-timeout', '.5',
                     '--state-timeout', '2', '--connect-timeout', '2']
@@ -320,7 +320,7 @@ class ClientRosTests(unittest.TestCase):
             environment['ROS_IP'] = '127.0.0.1'
             environment.pop('ROS_HOSTNAME', None)
             started = time.monotonic()
-            result = subprocess.run([sys.executable, '-m', 'ag_client.cli', 'status',
+            result = subprocess.run([sys.executable, '-m', 'ag_uav_client.cli', 'status',
                                      '--state-timeout', '.3'], env=environment,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     text=True, timeout=5.)
@@ -397,4 +397,4 @@ class ClientRosTests(unittest.TestCase):
 
 if __name__ == '__main__':
     rospy.init_node('ag_client_ros_test', anonymous=True)
-    rostest.rosrun('ag_client', 'ag_client_ros', ClientRosTests)
+    rostest.rosrun('ag_uav_client', 'ag_client_ros', ClientRosTests)

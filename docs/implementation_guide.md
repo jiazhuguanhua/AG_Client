@@ -7,7 +7,7 @@
 两端安装 ROS Noetic 和 FKIE 的 discovery、sync 包，将本仓库放进 catkin 工作区的 `src/`。
 
 - UAV 构建 `ag_uav_client`，例如在 `~/catkin_ws` 执行 `catkin_make --only-pkg-with-deps ag_uav_client -DPYTHON_EXECUTABLE=/usr/bin/python3`。
-- UGV 在已 source 原车工作区的环境里，用独立 overlay 构建 `ag_ugv_task`。它复用原车的 `ugv_navigation` 和 `ugv_slicer_control`。不要把本仓库放进已有同名 `slicer_air_ground_msgs` 的车端 `src/`。
+- UGV 在已 source 原车工作区的环境里，用独立 overlay 构建 `ag_ugv_task`。它自带任务执行器，并复用原车的 `ugv_navigation` 地理定位和 `ugv_slicer_control`，无需旧 `air_ground_task` 包装脚本。不要把本仓库放进已有同名 `slicer_air_ground_msgs` 的车端 `src/`。
 
 车端使用原包的 Docker 包装脚本时，可把 overlay 放在原项目根目录下的 `v2_ws/src/AG_Client`。由宿主机在原项目目录构建，原镜像需要有 FKIE：
 
@@ -77,7 +77,7 @@ UGV 在任务层维护路线，复用车端定位配准、地图转换、`/ugv/m
 ```bash
 catkin_make run_tests_ag_ugv_task
 source devel/setup.bash
-/usr/bin/python3 src/AG_Client/ag_ugv_task/test/check_v2_ros.py /path/to/ugv_navigation/scripts
+/usr/bin/python3 src/AG_Client/ag_ugv_task/test/check_v2_ros.py
 ```
 
-隔离联调自建 loopback ROS master，复用原车执行器代码并用模拟导航验证，不启动飞行或底盘节点。
+隔离联调自建 loopback ROS master，用车端执行器和模拟导航验证，不启动飞行或底盘节点。

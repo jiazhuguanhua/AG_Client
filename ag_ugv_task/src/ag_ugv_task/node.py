@@ -13,23 +13,24 @@ from std_msgs.msg import String
 
 from ag_uav_client.v2 import COMMAND, STATE, decode, number, snapshot, vehicle_position
 
+from .executor import TaskExecutor
+from .navigation import RosNavigation
 from .route import Route
 
 
 def load_vehicle_modules():
-    """Locate the original car stack in either a source/devel or install overlay."""
+    """Find only the installed car geographic modules, not its task interface."""
     share = Path(rospkg.RosPack().get_path('ugv_navigation'))
     candidates = [share / 'scripts']
     candidates.extend(Path(path).resolve().parent for path in
-                      (roslib.packages.find_resource('ugv_navigation', 'air_ground_node.py')))
+                      (roslib.packages.find_resource('ugv_navigation', 'geographic.py')))
     for directory in candidates:
         if all((directory / (name + '.py')).is_file() for name in (
-                'air_ground_node', 'air_ground_executor', 'geographic_goal_core', 'geographic_core')):
+                'geographic', 'geographic_goal_core', 'geographic_core')):
             sys.path.insert(0, str(directory))
             return tuple(importlib.import_module(name) for name in
-                         ('air_ground_node', 'air_ground_executor',
-                          'geographic_goal_core', 'geographic_core'))
-    raise RuntimeError('Source the original UGV navigation workspace with its air_ground and geographic modules installed')
+                         ('geographic', 'geographic_goal_core', 'geographic_core'))
+    raise RuntimeError('Source the original UGV navigation workspace with its geographic modules installed')
 
 
 class GroundNode:
@@ -113,8 +114,9 @@ class GroundNode:
 
 def main():
     rospy.init_node('ag_ugv_task')
-    bridge, runner, geographic, coordinates = load_vehicle_modules()
-    backend = bridge.RosNavigation(rospy, rospy.get_param('~action', '/ugv/move_base'))
+    geographic_client, geographic, coordinates = load_vehicle_modules()
+    backend = RosNavigation(rospy, rospy.get_param('~action', '/ugv/move_base'),
+                            geographic_client.GeographicClient, geographic)
 
     def current_position():
         try:
@@ -137,4 +139,4 @@ def main():
     options = {key: rospy.get_param('~' + key, default) for key, default in (
         ('via_pass_radius_m', .25), ('segment_timeout_s', 120.),
         ('cancel_timeout_s', 3.), ('stop_timeout_s', 8.))}
-    GroundNode(backend, runner.TaskExecutor, current_position, options).run()
+    GroundNode(backend, TaskExecutor, current_position, options).run()

@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """Exercise both V2 nodes on a private loopback ROS master and fake navigator."""
-import importlib
 import json
 import os
-from pathlib import Path
 import signal
 import socket
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -183,13 +180,8 @@ def run(executor_type):
 
 
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit('Usage: check_v2_ros.py /path/to/ugv_navigation/scripts')
-    scripts = Path(sys.argv[1]).resolve()
-    if not (scripts / 'air_ground_executor.py').is_file():
-        raise SystemExit('Original vehicle TaskExecutor not found')
-    sys.path.insert(0, str(scripts))
-    executor_type = importlib.import_module('air_ground_executor').TaskExecutor
+    from ag_ugv_task.executor import TaskExecutor
+
     with socket.socket() as free:
         free.bind(('127.0.0.1', 0))
         port = free.getsockname()[1]
@@ -206,7 +198,7 @@ def main():
                 except OSError:
                     return False
             wait_for(master_alive, 'private ROS master')
-            run(executor_type)
+            run(TaskExecutor)
         finally:
             os.killpg(core.pid, signal.SIGINT)
             core.wait(timeout=10)

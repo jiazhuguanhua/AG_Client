@@ -11,7 +11,7 @@ import rospkg
 import rospy
 from std_msgs.msg import String
 
-from ag_uav_client.v2 import COMMAND, STATE, decode, number, snapshot, vehicle_position
+from ag_uav_client.v2 import COMMAND, STATE, decode, number, snapshot, validate, vehicle_position
 
 from .executor import TaskExecutor
 from .navigation import RosNavigation
@@ -39,6 +39,9 @@ class GroundNode:
         self.route = Route()
         self.executor = executor_type(self.route, backend, **(executor_options or {}))
         self.last_command = None
+        self.last_qr_report = None
+        self.qr_task_id = None
+        self.qr_reports = {}
         self.inbox = queue.Queue(maxsize=64)
         self.publisher = rospy.Publisher(STATE, String, queue_size=1, latch=True)
         self.subscriber = rospy.Subscriber(COMMAND, String, self.receive, queue_size=64)
@@ -51,22 +54,49 @@ class GroundNode:
         except queue.Full:
             rospy.logwarn_throttle(2, 'V2 task command queue is full')
 
+    def report_qr(self, command):
+        command = validate(command)
+        self.route.accept_sequence(command['seq'])
+        task_id, report = command['task_id'], command['qr']
+        if self.qr_task_id != task_id:
+            self.qr_task_id = task_id
+            self.qr_reports.clear()
+        report = dict(report, task_id=task_id)
+        previous = self.qr_reports.get(report['qr_id'])
+        if previous is not None:
+            if report['revision'] < previous['revision']:
+                raise ValueError('STALE_QR_REVISION')
+            if report['revision'] == previous['revision'] and report != previous:
+                raise ValueError('QR_REVISION_CONFLICT')
+        self.qr_reports[report['qr_id']] = report
+        return dict(accepted=True)
+
     def process(self, raw, received_at):
         command = {}
         try:
             command = decode(raw)
-            result = self.executor.command(command)
+            if command.get('op') == 'REPORT_QR':
+                result = self.report_qr(command)
+            else:
+                result = self.executor.command(command)
         except ValueError as exc:
             result = dict(accepted=False, reason=str(exc))
-        self.last_command = {
+        receipt = {
             key: command.get(key) if isinstance(command.get(key), str) else None
             for key in ('task_id', 'op')
         }
         seq, stamp = command.get('seq'), command.get('sent_at')
-        self.last_command.update(seq=seq if type(seq) is int else None,
-                                 sent_at=stamp if number(stamp) else None,
-                                 received_at=received_at, accepted=result['accepted'],
-                                 reason=result.get('reason') or None)
+        receipt.update(seq=seq if type(seq) is int else None,
+                       sent_at=stamp if number(stamp) else None,
+                       received_at=received_at, accepted=result['accepted'],
+                       reason=result.get('reason') or None)
+        if command.get('op') == 'REPORT_QR':
+            qr = command.get('qr')
+            qr_id = qr.get('qr_id') if isinstance(qr, dict) else None
+            receipt['qr_id'] = qr_id if isinstance(qr_id, str) else None
+            self.last_qr_report = receipt
+        else:
+            self.last_command = receipt
         self.publish_if_changed()
 
     def publish_if_changed(self):
@@ -85,7 +115,8 @@ class GroundNode:
 
         summary = dict(task_id=self.route.task_id, phase=phase, reason=reason,
                        active=active, mvps=self.route.mvps, target=self.route.target,
-                       last_command=self.last_command)
+                       last_command=self.last_command, last_qr_report=self.last_qr_report,
+                       qr_reports=list(self.qr_reports.values()))
         signature = json.dumps(summary, sort_keys=True)
         now = time.monotonic()
         if signature != self.last_signature or now - self.published >= 1.0:

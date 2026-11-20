@@ -9,6 +9,7 @@ UAV_STATE = '/air_ground/v2/uav_state'
 INTENT = '/air_ground/v2/uav_intent'
 OPERATIONS = {
     'SET_TARGET': {'target'},
+    'REPORT_QR': {'qr'},
     'INSERT_MVP': {'mvp_id', 'point'},
     'DEL_MVP': {'mvp_id'},
     'UPDATE_MVP': {'mvp_id', 'point'},
@@ -37,6 +38,33 @@ def number(value):
         return type(value) in (int, float) and math.isfinite(value)
     except OverflowError:
         return False
+
+
+def reported_point(value, metadata=frozenset()):
+    if not isinstance(value, dict) or not set(value) <= {'lat', 'lon', 'image_id'} | metadata:
+        raise ProtocolError('invalid reported point fields')
+    result = coordinates({key: value[key] for key in ('lat', 'lon') if key in value})
+    if 'image_id' in value:
+        result['image_id'] = _id(value['image_id'], 'image_id')
+    return result
+
+
+def qr_report(value):
+    required = {'qr_id', 'measured_at', 'revision'}
+    if not isinstance(value, dict) or not required <= value.keys():
+        raise ProtocolError('qr must contain qr_id, measured_at and revision')
+    result = reported_point(value, required | {'altitude_m'})
+    stamp, revision = value['measured_at'], value['revision']
+    if not number(stamp) or stamp <= 0:
+        raise ProtocolError('measured_at must be a positive timestamp')
+    if type(revision) is not int or not 1 <= revision <= MAX_SEQ:
+        raise ProtocolError('revision must be a positive JSON-safe integer')
+    if 'altitude_m' in value:
+        if not number(value['altitude_m']):
+            raise ProtocolError('altitude_m must be finite')
+        result['altitude_m'] = value['altitude_m']
+    result.update(qr_id=_id(value['qr_id'], 'qr_id'), measured_at=stamp, revision=revision)
+    return result
 
 
 def decode(raw):
@@ -71,9 +99,12 @@ def validate(value, wire=True):
     for key in ('task_id', 'mvp_id', 'before_id'):
         if key in out:
             out[key] = _id(out[key], key)
-    for key in ('target', 'point'):
-        if key in out:
-            out[key] = coordinates(out[key])
+    if 'target' in out:
+        out['target'] = reported_point(out['target'])
+    if 'point' in out:
+        out['point'] = coordinates(out['point'])
+    if 'qr' in out:
+        out['qr'] = qr_report(out['qr'])
     return out
 
 
@@ -82,8 +113,10 @@ def vehicle_position(lat=None, lon=None, stamp=None):
 
 
 def snapshot(vehicle_id, now, position, *, task_id=None, phase=None, reason=None,
-             active=None, mvps=None, target=None, last_command=None):
+             active=None, mvps=None, target=None, last_command=None,
+             qr_reports=None, last_qr_report=None):
     return dict(version=2, updated_at=now, vehicle_id=vehicle_id,
                 vehicle_position=position, task_id=task_id, phase=phase, reason=reason,
                 active_point=active, remaining_mvps=list(mvps or []), target=target,
-                last_command=last_command)
+                last_command=last_command, qr_reports=list(qr_reports or []),
+                last_qr_report=last_qr_report)

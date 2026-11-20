@@ -57,11 +57,15 @@ UAV 端手工联调使用 `rosrun ag_uav_client test_menu.py`。菜单可分别�
 
 ```bash
 rosrun ag_uav_client v2_send.py SET_TARGET run-01 --lat "$TARGET_LAT" --lon "$TARGET_LON"
+rosrun ag_uav_client v2_send.py REPORT_QR run-01 --qr-id QR002 \
+  --lat "$DISPLAY_LAT" --lon "$DISPLAY_LON" --measured-at "$MEASURED_AT" --revision 1
 rosrun ag_uav_client v2_send.py INSERT_MVP run-01 --mvp-id p1 --lat "$MVP_LAT" --lon "$MVP_LON"
 rosrun ag_uav_client v2_send.py PAUSE run-01
 ```
 
 重复 `SET_TARGET run-01` 更新同一任务的终点。程序可向 UAV 本机 `/air_ground/v2/uav_intent` 发布 JSON，例如 `{"op":"SET_TARGET","task_id":"run-01","target":{"lat":31.94,"lon":118.78}}`。在 UGV 的 `last_command` 看是否受理，在 `phase` 和 `active_point` 看是否执行。现有 maxt 的二维码下发仍使用 V1，不能作为 V2 发送入口。
+
+`REPORT_QR` 的 `MEASURED_AT` 填采样的 ROS 时间秒数。用 UGV 状态的 `last_qr_report` 查看受理结果，用 `qr_reports` 读取展示点。终点与展示点均支持可选的 `--image-id`。
 
 ## 实现边界与离线测试
 

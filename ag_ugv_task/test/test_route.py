@@ -1,5 +1,6 @@
 import unittest
 
+from ag_uav_client.v2 import validate
 from ag_ugv_task.route import Route
 
 A = {'lat': 31.0, 'lon': 118.0}
@@ -79,6 +80,16 @@ class RouteTest(unittest.TestCase):
         self.assertEqual(self.route.target, A)
         self.assertFalse(self.route.handle(rejected)['accepted'])
         self.assertFalse(self.command('SET_TARGET', target={'lat': 91, 'lon': 0}))
+
+    def test_qr_report_metadata_validation(self):
+        report = dict(A, qr_id='QR002', measured_at=1, revision=1, image_id='photo')
+        intent = dict(op='REPORT_QR', task_id='run', qr=report)
+        self.assertEqual(validate(intent, wire=False), intent)
+        for invalid in (dict(image_id=''), dict(image_id={'data': 'abc'}), dict(revision=True),
+                        dict(measured_at=float('inf')), dict(lat=91), dict(data='abc')):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    validate(dict(intent, qr=dict(report, **invalid)), wire=False)
 
 
 if __name__ == '__main__':

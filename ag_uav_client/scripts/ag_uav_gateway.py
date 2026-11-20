@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stamp local route intents and publish UAV telemetry on the V2 link."""
+"""Stamp local V2 intents and publish UAV telemetry."""
 import json
 import threading
 import time
@@ -18,6 +18,7 @@ class UavGateway:
         self.lock = threading.Lock()
         self.sequence = 0
         self.last_command = None
+        self.last_qr_report = None
         self.fix = None
         self.flight_phase = None
         self.command = rospy.Publisher(COMMAND, String, queue_size=32, latch=False)
@@ -54,8 +55,13 @@ class UavGateway:
                 self.sequence = max(self.sequence + 1, time.time_ns() // 1000)
                 command.update(version=2, seq=self.sequence, sent_at=rospy.Time.now().to_sec())
                 self.command.publish(String(data=json.dumps(validate(command), allow_nan=False)))
-                self.last_command = {key: command[key] for key in ('task_id', 'op', 'seq', 'sent_at')}
-                self.last_command.update(accepted=None, received_at=None, reason=None)
+                receipt = {key: command[key] for key in ('task_id', 'op', 'seq', 'sent_at')}
+                receipt.update(accepted=None, received_at=None, reason=None)
+                if command['op'] == 'REPORT_QR':
+                    receipt['qr_id'] = command['qr']['qr_id']
+                    self.last_qr_report = receipt
+                else:
+                    self.last_command = receipt
                 self._publish_state()
         except ValueError as exc:
             rospy.logwarn('Invalid V2 intent: %s', exc)
@@ -69,7 +75,7 @@ class UavGateway:
         phase = phase[0] if phase and time.monotonic() - phase[1] <= 2.0 else None
         last = self.last_command
         data = snapshot('uav', now, position, phase=phase, task_id=last['task_id'] if last else None,
-                        last_command=last)
+                        last_command=last, last_qr_report=self.last_qr_report)
         self.state.publish(String(data=json.dumps(data, ensure_ascii=False, allow_nan=False)))
 
     def publish_state(self, _event):

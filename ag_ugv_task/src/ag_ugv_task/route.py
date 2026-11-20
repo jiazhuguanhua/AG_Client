@@ -25,7 +25,7 @@ class Route:
         if self.mvps:
             return dict(kind='MVP', **self.mvps[0])
         if self.target is not None:
-            return dict(kind='TARGET', mvp_id=None, **self.target)
+            return dict(kind='TARGET', mvp_id=None, lat=self.target['lat'], lon=self.target['lon'])
         return None
 
     @staticmethod
@@ -33,12 +33,15 @@ class Route:
         return dict(latitude=point['lat'], longitude=point['lon'],
                     altitude_ellipsoid_m=None, yaw=None)
 
+    def accept_sequence(self, sequence):
+        if sequence <= self.last_sequence:
+            raise ValueError('STALE_SEQUENCE')
+        self.last_sequence = sequence
+
     def handle(self, command, validate_route=None):
         try:
             command = validate(command)
-            if command['seq'] <= self.last_sequence:
-                raise ValueError('STALE_SEQUENCE')
-            self.last_sequence = command['seq']
+            self.accept_sequence(command['seq'])
             if (command['op'] == 'PAUSE' and command['task_id'] == self.task_id
                     and self.phase in ('PAUSING', 'PAUSED')):
                 return dict(accepted=True, reason=None, duplicate=True)

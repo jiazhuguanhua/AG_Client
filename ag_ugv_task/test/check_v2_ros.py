@@ -103,13 +103,15 @@ def run(executor_type):
         for key, value in options.items():
             args.extend(['--' + key.replace('_', '-'), str(value)])
         subprocess.run(args, check=True, timeout=10, stdout=subprocess.DEVNULL)
+        receipt = 'last_qr_report' if op == 'REPORT_QR' else 'last_command'
         def check(value):
-            cmd = value.get('last_command') or {}
+            cmd = value.get(receipt) or {}
             return cmd.get('op') == op and cmd['seq'] > observed[0]
-        cmd = state(check, op)['last_command']
+        cmd = state(check, op)[receipt]
         assert cmd['accepted'] is accepted, cmd
         assert cmd['received_at'] >= cmd['sent_at']
         observed[0] = cmd['seq']
+        return cmd
 
     try:
         rospy.loginfo('Simulation only: no flight, real navigation or chassis nodes.')
@@ -123,9 +125,33 @@ def run(executor_type):
         wait_for(lambda: last.get('uav', {}).get('vehicle_position', {}).get('lat') == 31.4,
                  'UAV GPS snapshot')
 
+        first_qr = dict(qr_id='QR002', lat=30, lon=118, measured_at=1, revision=1,
+                        altitude_m=40, image_id='qr002-photo')
+        receipt = send('REPORT_QR', **first_qr)
+        assert receipt['qr_id'] == 'QR002'
+        state(lambda s: s.get('qr_reports') == [dict(first_qr, task_id='line')], 'first QR report')
+        wait_for(lambda: (last.get('uav', {}).get('last_qr_report') or {}).get('seq') == receipt['seq'],
+                 'UAV QR send status')
+        assert last['ugv']['phase'] == 'IDLE' and last['ugv']['last_command'] is None
+        assert last['uav']['task_id'] is None and not backend.goals
+        send('REPORT_QR', **first_qr)
+        assert len(last['ugv']['qr_reports']) == 1
+        changed_qr = dict(first_qr, revision=2, image_id='qr002-new-photo')
+        send('REPORT_QR', **changed_qr)
+        stale = send('REPORT_QR', accepted=False, **first_qr)
+        assert stale['reason'] == 'STALE_QR_REVISION'
+        assert last['ugv']['qr_reports'] == [dict(changed_qr, task_id='line')]
+
         send('INSERT_MVP', accepted=False, mvp_id='missing', lat=31, lon=118)
-        send('SET_TARGET', lat=32, lon=119)
+        send('SET_TARGET', lat=32, lon=119, image_id='target-photo')
         state(lambda s: (s.get('active_point') or {}).get('kind') == 'TARGET', 'original target')
+        target_receipt = send('SET_TARGET', lat=32, lon=119, image_id='updated-target-photo')
+        assert last['ugv']['target'] == dict(lat=32, lon=119, image_id='updated-target-photo')
+        send('REPORT_QR', qr_id='QR003', lat=31, lon=118, measured_at=2, revision=1)
+        assert len(last['ugv']['qr_reports']) == 2
+        assert last['ugv']['last_command'] == target_receipt
+        assert last['ugv']['phase'] == 'EXECUTING'
+        assert backend.cancels == 0 and backend.goals == [[32, 119, 0]]
         send('INSERT_MVP', mvp_id='p1', lat=33, lon=120)
         state(lambda s: s.get('phase') == 'SWITCHING', 'switching to p1')
         assert backend.cancels == 1 and len(backend.goals) == 1
@@ -170,7 +196,7 @@ def run(executor_type):
         stopped = state(lambda s: s.get('phase') == 'STOPPED', 'stopped')
         assert stopped['target'] is None and stopped['active_point'] is None
         send('RESUME', task='next', accepted=False)
-        print('PASS: UAV/Ground state, all 7 operations, original Action executor, arrival and confirmed stop')
+        print('PASS: all 8 operations, QR reports and image IDs, arrival and confirmed stop')
     finally:
         rospy.signal_shutdown('test finished')
         worker.join(timeout=4)

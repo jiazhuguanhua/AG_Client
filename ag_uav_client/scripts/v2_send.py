@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send one local V2 route intent to the UAV gateway."""
+"""Send one local V2 intent to the UAV gateway."""
 import argparse
 import time
 
@@ -18,10 +18,22 @@ def main():
     parser.add_argument('--lon', type=float)
     parser.add_argument('--mvp-id')
     parser.add_argument('--before-id')
+    parser.add_argument('--qr-id')
+    parser.add_argument('--measured-at', type=float)
+    parser.add_argument('--revision', type=int)
+    parser.add_argument('--altitude-m', type=float)
+    parser.add_argument('--image-id')
     args = parser.parse_args(rospy.myargv()[1:])
     command = dict(op=args.op, task_id=args.task_id)
-    if args.lat is not None or args.lon is not None:
-        command['target' if args.op == 'SET_TARGET' else 'point'] = dict(lat=args.lat, lon=args.lon)
+    point = {key: getattr(args, key) for key in ('lat', 'lon', 'image_id')
+             if getattr(args, key) is not None}
+    if point:
+        field = {'SET_TARGET': 'target', 'REPORT_QR': 'qr'}.get(args.op, 'point')
+        command[field] = point
+    metadata = {key: getattr(args, key) for key in ('qr_id', 'measured_at', 'revision', 'altitude_m')
+                if getattr(args, key) is not None}
+    if metadata:
+        command.setdefault('qr', {}).update(metadata)
     if args.mvp_id is not None:
         command['mvp_id'] = args.mvp_id
     if args.before_id is not None:

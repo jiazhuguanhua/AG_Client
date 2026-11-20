@@ -9,18 +9,16 @@
 - UAV 构建 `ag_uav_client`，例如在 `~/catkin_ws` 执行 `catkin_make --only-pkg-with-deps ag_uav_client -DPYTHON_EXECUTABLE=/usr/bin/python3`。
 - UGV 在已 source 原车工作区的环境里，用独立 overlay 构建 `ag_ugv_task`。它自带任务执行器，并复用原车的 `ugv_navigation` 地理定位和 `ugv_slicer_control`，无需旧 `air_ground_task` 包装脚本。不要把本仓库放进已有同名 `slicer_air_ground_msgs` 的车端 `src/`。
 
-车端使用原包的 Docker 包装脚本时，可把 overlay 放在原项目根目录下的 `v2_ws/src/AG_Client`。由宿主机在原项目目录构建，原镜像需要有 FKIE：
+UGV 直接在宿主机加载原车工作区，然后在 V2 overlay 根目录构建并加载：
 
 ```bash
-./run.sh shell bash -c 'set -e
-  cd /workspace/v2_ws
-  catkin_make --only-pkg-with-deps ag_ugv_task -DPYTHON_EXECUTABLE=/usr/bin/python3
-  catkin_make install'
+catkin_make --only-pkg-with-deps ag_ugv_task -DPYTHON_EXECUTABLE=/usr/bin/python3
+source devel/setup.bash
 ```
 
 ## 两端启动
 
-先让 UGV 原有定位和 RTK 导航正常运行。实车行驶还需原有底盘链路就绪。V2 车端入口替代旧的 `./run.sh tasks`，同一台车只运行一个任务执行器。
+先让 UGV 原有定位和 RTK 导航正常运行。实车行驶还需原有底盘链路就绪。同一台车只运行一个任务执行器。
 
 **UAV** · 在飞机电脑上：
 
@@ -39,13 +37,6 @@ ROS_MASTER_URI=http://192.168.10.32:11311 ROS_IP=192.168.10.32 \
 unset ROS_HOSTNAME
 ROS_MASTER_URI=http://192.168.10.33:11311 ROS_IP=192.168.10.33 \
   roslaunch ag_ugv_task ugv.launch
-```
-
-如果使用上面的 Docker overlay，从 UGV 宿主机运行：
-
-```bash
-ROS_MASTER_URI=http://192.168.10.33:11311 ROS_IP=192.168.10.33 \
-  ./run.sh shell bash -c 'source /workspace/v2_ws/install/setup.bash && exec roslaunch ag_ugv_task ugv.launch'
 ```
 
 已有 FKIE 时，先停旧实例再使用一键入口。若要保留已经配置好 V2 的 FKIE 实例，可给对应一键入口加 `start_fkie:=false`。更换电台 IP 时，设置本端的 `ROS_MASTER_URI` 和 `ROS_IP`，并用 UAV 侧 `ugv_ip:=...` 或 UGV 侧 `uav_ip:=...` 改对端地址。两端要使用各自 master。补充网络排查见 [FKIE 排查](chore/fkie_radio.md)。
@@ -83,14 +74,3 @@ source devel/setup.bash
 ```
 
 隔离联调自建 loopback ROS master，用车端执行器和模拟导航验证，不启动飞行或底盘节点。
-
-## UGV Compose 服务
-
-`deploy/ugv/compose.yaml` 将 V2 任务节点、FKIE discovery 和 sync 放进一个 host 网络服务，复用 UGV 原 master。使用前设置 `AG_UID`、`AG_GID`、`AG_RTK_ROOT`、`AG_NORTK_ROOT`、`AG_OVERLAY_ROOT`。overlay 须已安装，并建好 `runtime/`。服务的原车目录和安装产物只读挂载，ROS 日志落到 overlay 内的 `runtime/.ros`。
-
-Compose 默认只发布状态，`reason: MONITOR_ONLY`，不订阅任务命令，也不连接导航和停车控制。需要正式接收车辆任务时，由现场单独决定启用执行模式。旧 FKIE 停用后可启动此服务，避免端口冲突。
-
-```bash
-docker compose -f deploy/ugv/compose.yaml up -d
-docker logs -f ugv-ag-v2
-```

@@ -129,43 +129,9 @@ def base_position(status, geometry, coordinates, fix_max_age):
     return vehicle_position()
 
 
-def monitor_only(geometry, coordinates):
-    """Publish live localization without opening any task or control interface."""
-    sample = None
-
-    def receive(message):
-        nonlocal sample
-        try:
-            sample = decode(message.data), time.monotonic()
-        except ValueError:
-            sample = None
-
-    publisher = rospy.Publisher(STATE, String, queue_size=1, latch=True)
-    subscriber = rospy.Subscriber('/geographic/status', String, receive, queue_size=1)
-    status_max_age = rospy.get_param('/geographic/status_max_age_s', 1.)
-    fix_max_age = rospy.get_param('/geographic/max_fix_age_s', 2.5)
-    try:
-        while not rospy.is_shutdown():
-            now = rospy.Time.now().to_sec()
-            position = vehicle_position()
-            observed = sample
-            if observed:
-                status, received = observed
-                if not geometry.status_problem(status, received, time.monotonic(), now, max_age=status_max_age):
-                    position = base_position(status, geometry, coordinates, fix_max_age)
-            data = snapshot('ugv', now, position, phase='IDLE', reason='MONITOR_ONLY')
-            publisher.publish(String(data=json.dumps(data, allow_nan=False)))
-            time.sleep(1.)
-    finally:
-        subscriber.unregister()
-
-
 def main():
     rospy.init_node('ag_ugv_task')
     geographic_client, geographic, coordinates = load_vehicle_modules()
-    if rospy.get_param('~monitor_only', False):
-        monitor_only(geographic, coordinates)
-        return
     backend = RosNavigation(rospy, rospy.get_param('~action', '/ugv/move_base'),
                             geographic_client.GeographicClient, geographic)
 

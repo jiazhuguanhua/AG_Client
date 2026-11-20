@@ -6,11 +6,9 @@
     <arg name="peer_name" value="uav"/>
     <arg name="peer_ip" value="$(arg uav_ip)"/>
   </include>
-  <arg name="monitor_only" default="false"/>
   <arg name="action" default="/ugv/move_base"/>
   <arg name="via_pass_radius_m" default="0.25"/>
   <node pkg="ag_ugv_task" type="ag_ugv_task_node.py" name="ag_ugv_task" output="screen" required="true">
-    <param name="monitor_only" value="$(arg monitor_only)" type="bool"/>
     <param name="action" value="$(arg action)"/>
     <param name="via_pass_radius_m" value="$(arg via_pass_radius_m)" type="double"/>
   </node>
